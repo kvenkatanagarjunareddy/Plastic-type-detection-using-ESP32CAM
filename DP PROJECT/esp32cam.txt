@@ -1,0 +1,52 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include "esp_camera.h"
+
+const char* ssid = "Xiaomi 11i";
+const char* password = "12345670";
+const char* serverUrl = "http://192.168.139.97:5000/upload";
+
+unsigned long previousMillis = 0;
+const long interval = 5000;  // 5 seconds
+
+void setup() {
+    Serial.begin(115200);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nWiFi connected!");
+
+    // Initialize camera
+    camera_config_t config;
+    config.frame_size = FRAMESIZE_QVGA;
+    config.pixel_format = PIXFORMAT_JPEG;
+    config.jpeg_quality = 12;
+    esp_camera_init(&config);
+}
+
+void loop() {
+    unsigned long currentMillis = millis();
+    
+    if (currentMillis - previousMillis >= interval) {
+        previousMillis = currentMillis;
+
+        camera_fb_t *fb = esp_camera_fb_get();
+        if (!fb) {
+            Serial.println("Camera capture failed!");
+            return;
+        }
+
+        HTTPClient http;
+        http.begin(serverUrl);
+        http.addHeader("Content-Type", "image/jpeg");
+
+        int httpResponseCode = http.POST(fb->buf, fb->len);
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+
+        esp_camera_fb_return(fb);
+        http.end();
+    }
+}
